@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang='tr'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>İyilik Haritası</title>
+<script src='https://code.highcharts.com/maps/highmaps.js'></script>
+<style>
+body{margin:0;background:#f7f1e3;font-family:Arial;color:#143d31}
+.wrap{max-width:680px;margin:auto;padding:20px}
+.card{background:#fffdf8;border-radius:28px;padding:22px;margin:18px 0;border:1px solid #e6ddca}
+h1{font-size:40px}
+.lead{font-size:19px;color:#68746d;line-height:1.5}
+.stats{display:flex;gap:10px;flex-wrap:wrap}
+.stat{flex:1;min-width:120px;background:#f3eee2;padding:14px;border-radius:18px}
+.stat b{display:block;font-size:25px}
+.bar{height:14px;background:#eee3d1;border-radius:12px;overflow:hidden}
+.fill{height:100%;background:#2f8062}
+.map{height:430px}
+.selected{background:#14543f;color:white;padding:16px;border-radius:18px;font-weight:bold;font-size:20px}
+.rank div,.recent div{padding:11px 0;border-bottom:1px solid #eee}
+a{color:#143d31;font-weight:bold}
+.causes{display:grid;gap:12px}
+.cause{background:#f3eee2;border-radius:18px;padding:15px}
+.causeTop{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.causeTitle{font-size:18px;font-weight:800}
+.causeAmount{font-size:20px;font-weight:900;white-space:nowrap}
+.causeDesc{font-size:14px;line-height:1.45;color:#68746d;margin-top:6px}
+.notice{background:#e7f1e9;border-radius:16px;padding:14px;margin-top:12px;line-height:1.5}
+@media(max-width:500px){h1{font-size:34px}.map{height:380px}}
+</style>
+</head>
+<body>
+<div class='wrap'>
+<a href='/'>← Tarhana Satış Sayacı</a>
+
+<h1>Türkiye iyilikle doluyor.</h1>
+<p class='lead'>Her alışverişin iyilik payı müşterinin şehrine işleniyor. Müşteri, kendi iyilik payının hangi alanda kullanılacağını seçebiliyor.</p>
+
+<div class='card'>
+<small>İlk iyilik hedefimiz</small>
+<h1 id='total'>₺0</h1>
+<div class='bar'><div id='fill' class='fill'></div></div>
+<div class='stats'>
+<div class='stat'><b id='count'>0</b>iyilik</div>
+<div class='stat'><b id='citycount'>0</b>şehir</div>
+<div class='stat'><b id='leader'>—</b>önde</div>
+</div>
+</div>
+
+<div class='card'>
+<h2>🤝 İyilik Nereye Gidiyor?</h2>
+<p class='lead' style='font-size:16px'>Müşterilerin yaptığı seçimlere göre biriken iyilik payları.</p>
+<div id='causeList' class='causes'></div>
+<div id='unallocated' class='notice' style='display:none'></div>
+</div>
+
+<div class='card'>
+<h2>İyilik Haritası 🇹🇷</h2>
+<div id='map' class='map'></div>
+<div id='selected' class='selected'>🌱 Bir şehre dokun</div>
+</div>
+
+<div class='card rank'>
+<h2>🏆 En İyiliksever Şehirler</h2>
+<div id='ranking'></div>
+</div>
+
+<div class='card recent'>
+<h2>❤️ Son İyilikler</h2>
+<div id='recent'></div>
+</div>
+</div>
+
+<script>
+const SB='https://dwiiacwamuzluhhztlor.supabase.co',
+KEY='sb_publishable_ZOLAzCg-cqqvqKnGyMbS0w_BR85mySR',
+H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
+
+const norm=s=>(s||'')
+.toLocaleLowerCase('tr-TR')
+.replace(/ı/g,'i')
+.replace(/ğ/g,'g')
+.replace(/ü/g,'u')
+.replace(/ş/g,'s')
+.replace(/ö/g,'o')
+.replace(/ç/g,'c')
+.replace('zinguldak','zonguldak')
+.trim();
+
+const fix=n=>n==='Zinguldak'?'Zonguldak':n;
+
+let sums={},rows=[];
+
+async function loadCauses(totalIyilik){
+  try{
+    const r=await fetch(SB+'/rest/v1/rpc/get_iyilik_causes',{
+      method:'POST',
+      headers:H,
+      body:'{}'
+    });
+
+    if(!r.ok) throw new Error('cause load failed');
+
+    const causes=await r.json();
+    causeList.innerHTML=causes.map(x=>`
+      <div class="cause">
+        <div class="causeTop">
+          <div class="causeTitle">${x.emoji} ${x.title}</div>
+          <div class="causeAmount">₺${Number(x.total_amount||0).toLocaleString('tr-TR')}</div>
+        </div>
+        <div class="causeDesc">${x.description||''} · ${Number(x.support_count||0)} müşteri seçimi</div>
+      </div>
+    `).join('') || 'Henüz bir iyilik alanı seçilmedi.';
+
+    const allocated=causes.reduce((a,x)=>a+Number(x.total_amount||0),0);
+    const waiting=Math.max(0,Number(totalIyilik||0)-allocated);
+
+    if(waiting>0.009){
+      unallocated.style.display='block';
+      unallocated.innerHTML=`⏳ <b>₺${waiting.toLocaleString('tr-TR')}</b> İyilik Payı henüz müşteriler tarafından bir alana yönlendirilmedi.`;
+    }else{
+      unallocated.style.display='none';
+    }
+  }catch(e){
+    causeList.innerHTML='İyilik alanları şu anda yüklenemedi.';
+  }
+}
+
+async function init(){
+  sums={};
+
+  rows=await fetch(
+    SB+'/rest/v1/iyilik_contributions?select=*&order=created_at.desc',
+    {headers:H}
+  ).then(r=>r.json());
+
+  rows.forEach(x=>{
+    let k=norm(x.city);
+    sums[k]=(sums[k]||0)+Number(x.amount);
+  });
+
+  let t=Object.values(sums).reduce((a,b)=>a+b,0),
+      s=Object.entries(sums).sort((a,b)=>b[1]-a[1]);
+
+  total.textContent='₺'+t.toLocaleString('tr-TR');
+  count.textContent=rows.length;
+  citycount.textContent=Object.keys(sums).length;
+  fill.style.width=Math.min(100,t/10000*100)+'%';
+  leader.textContent=s.length ? (rows.find(r=>norm(r.city)===s[0][0])?.city||'—') : '—';
+
+  ranking.innerHTML=s.map((x,i)=>`
+    <div>
+      <b>${i+1}. ${rows.find(r=>norm(r.city)===x[0])?.city||x[0]}</b>
+      — ₺${x[1].toLocaleString('tr-TR')}
+    </div>
+  `).join('') || 'Henüz iyilik yok.';
+
+  recent.innerHTML=rows.slice(0,6).map(x=>`
+    <div>
+      🌱 <b>${x.city}</b> · ₺${Number(x.amount).toLocaleString('tr-TR')}
+      ${x.product_note?'· '+x.product_note:''}
+    </div>
+  `).join('') || 'İlk satış burada görünecek.';
+
+  await loadCauses(t);
+
+  let topo=await fetch('https://code.highcharts.com/mapdata/countries/tr/tr-all.topo.json').then(r=>r.json()),
+      shapes=Highcharts.geojson(topo),
+      data=shapes.map(s=>({
+        name:s.name||s.properties?.name||'',
+        value:sums[norm(s.name||s.properties?.name||'')]||0
+      }));
+
+  Highcharts.mapChart('map',{
+    chart:{map:topo,backgroundColor:'transparent'},
+    title:{text:null},
+    credits:{enabled:false},
+    legend:{enabled:false},
+    mapNavigation:{enabled:true,enableTouchZoom:false},
+    colorAxis:{min:0,minColor:'#79a493',maxColor:'#c96551'},
+    tooltip:{
+      pointFormatter:function(){
+        return '<b>'+fix(this.name)+'</b><br>İyilik: ₺'+
+          (sums[norm(this.name)]||0).toLocaleString('tr-TR');
+      }
+    },
+    series:[{
+      data,
+      joinBy:'name',
+      borderColor:'#fff',
+      point:{
+        events:{
+          click:function(){
+            selected.textContent='🌱 '+fix(this.name)+' · ₺'+
+              (sums[norm(this.name)]||0).toLocaleString('tr-TR')+' iyilik';
+          }
+        }
+      }
+    }]
+  });
+}
+
+init();
+</script>
+</body>
+</html>

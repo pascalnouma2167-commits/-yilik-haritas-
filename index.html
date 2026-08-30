@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang='tr'>
+<head>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>İyilik Mutfağı</title>
+<style>
+body{margin:0;background:#f7f1e3;font-family:Arial;color:#173d32}
+.w{max-width:680px;margin:auto;padding:20px}
+.top{display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+.brand{font-weight:800}
+.admin{border:0;background:none;color:#65756c}
+.hero{font-size:42px;margin:18px 0 6px}
+.sub{font-size:19px;line-height:1.5;color:#68746d}
+.card{background:#fffdf8;border:1px solid #e4dac8;border-radius:28px;padding:23px;margin:20px 0}
+.tag{display:inline-block;background:#e7f1e9;padding:8px 12px;border-radius:20px;font-weight:700}
+.price{font-size:54px;font-weight:900;margin:12px 0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.box{background:#f3eee2;border-radius:18px;padding:15px}
+.box b{display:block;font-size:27px}
+.bar{height:14px;background:#e9dfcf;border-radius:10px;overflow:hidden;margin:14px 0}
+.fill{height:100%;background:#398064}
+.rule{font-size:18px;line-height:1.55}
+.calc{background:#173d32;color:white;border-radius:22px;padding:20px;margin-top:16px}
+.calc select{width:100%;padding:13px;border-radius:12px;font-size:17px;margin:10px 0}
+.total{font-size:30px;font-weight:800}
+.offerBtn{width:100%;padding:15px;margin-top:12px;border-radius:14px;border:2px solid #173d32;background:#fff;color:#173d32;font-weight:800;font-size:18px}
+.modal{display:none;position:fixed;inset:0;background:#0008;padding:18px;z-index:10;overflow:auto}
+.panel{max-width:500px;margin:30px auto;background:#fff;padding:22px;border-radius:24px}
+.panel input,.panel select{box-sizing:border-box;width:100%;padding:13px;margin:6px 0 12px;border:1px solid #ccc;border-radius:11px}
+.save,.close,.approve,.reject,.copyBtn{width:100%;padding:14px;border:0;border-radius:12px;font-weight:bold}
+.save,.approve{background:#398064;color:#fff}
+.reject{background:#b95045;color:#fff;margin-top:6px}
+.close{margin-top:8px}
+.copyBtn{background:#173d32;color:#fff;margin-top:8px}
+.msg{font-weight:bold;margin-top:10px;line-height:1.5}
+.offerItem{background:#f6f1e7;border-radius:16px;padding:14px;margin:10px 0}
+.offerItem b{display:block;font-size:18px}
+.choiceWrap{display:grid;gap:12px;margin-top:14px}
+.cause{border:2px solid #e4dac8;background:#fffdf8;border-radius:18px;padding:16px;text-align:left;color:#173d32}
+.cause.canChoose{cursor:pointer}
+.cause.canChoose:hover{border-color:#398064}
+.causeTop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.causeTitle{font-size:19px;font-weight:800}
+.causeAmount{font-weight:800;white-space:nowrap}
+.causeDesc{color:#68746d;font-size:14px;line-height:1.45;margin-top:6px}
+.choiceHero{background:#173d32;color:#fff;border-radius:22px;padding:20px;margin-bottom:14px}
+.choiceHero .big{font-size:30px;font-weight:900}
+#choiceCard{display:none}
+.linkBox{margin-top:12px;padding:12px;background:#eef5ef;border-radius:12px;word-break:break-all;font-size:13px}
+.successBox{padding:14px;background:#e7f1e9;border-radius:14px;margin-top:12px}
+@media(max-width:500px){.hero{font-size:37px}.price{font-size:48px}}
+</style>
+</head>
+<body>
+<div class='w'>
+  <div class='top'>
+    <span class='brand'>🌿 İyilik Mutfağı</span>
+    <div>
+      <button class='admin' onclick='saleModal.style.display="block"'>Satış Ekle</button>
+      <button class='admin' onclick='settingsModal.style.display="block"'>Ayarlar</button>
+      <button class='admin' onclick='openOffersAdmin()'>Teklifler</button>
+    </div>
+  </div>
+
+  <h1 class='hero'>Erken alan avantajlı. 🌾</h1>
+  <p class='sub'>Tarhanamız dinamik fiyatla ilerliyor. Satılan her kilogramdan sonra fiyat belirlenen adım kadar yükseliyor.</p>
+
+  <div class='card'>
+    <span class='tag'>🌾 Tarhana · Dinamik Fiyat</span>
+    <div class='price' id='price'>₺250 <small style='font-size:18px'>/ kg</small></div>
+    <div class='grid'>
+      <div class='box'><b id='sold'>0 kg</b>satıldı</div>
+      <div class='box'><b id='remain'>500 kg</b>kaldı</div>
+    </div>
+    <div class='bar'><div class='fill' id='fill' style='width:0'></div></div>
+    <p id='progress'></p>
+    <div class='rule'><b>Fiyat nasıl çalışıyor?</b><br><span id='ruleText'></span></div>
+
+    <div class='calc'>
+      <b>Kaç kg almak istiyorsun?</b>
+      <select id='qty' onchange='calc()'></select>
+      <div>Bu siparişin toplamı</div>
+      <div class='total' id='orderTotal'>₺250</div>
+      <small id='range'></small>
+    </div>
+
+    <button class='offerBtn' onclick='openOffer()'>💬 Teklif Ver</button>
+    <p class='sub' style='font-size:15px'>Teklifin yönetici onayına gider. Onaylanırsa satış, teklif ettiğin birim fiyattan gerçekleşir.</p>
+  </div>
+
+  <div class='card' id='choiceCard'>
+    <div class='choiceHero'>
+      <div>💚 Senin İyilik Payın</div>
+      <div class='big' id='choiceAmount'>₺0</div>
+      <div style='margin-top:6px'>Bu tutarın hangi iyiliğe dönüşeceğini sen seç.</div>
+    </div>
+    <h2 style='margin-bottom:6px'>İyiliğini Seç</h2>
+    <p class='sub' style='font-size:16px;margin-top:0'>Seçimin yalnızca bir kez yapılabilir.</p>
+    <div id='choiceStatus'></div>
+    <div class='choiceWrap' id='choiceOptions'></div>
+  </div>
+
+  <div class='card'>
+    <h2>🤝 İyilik Alanları</h2>
+    <p class='sub' style='font-size:16px'>Müşteriler alışverişlerinden doğan iyilik payının hangi alana ayrılacağını kendileri seçer.</p>
+    <div class='choiceWrap' id='causeTotals'></div>
+  </div>
+
+  <div class='card'>
+    <h2>❤️ İyilik Haritası</h2>
+    <p class='sub'>Onaylanan satışların iyilik payı otomatik olarak müşterinin şehrine eklenir.</p>
+    <a href='/harita.html' style='font-weight:bold;color:#173d32'>İyilik Haritası'nı aç →</a>
+  </div>
+</div>
+
+<div id='offerModal' class='modal'><div class='panel'>
+  <h2>💬 Tarhana Teklifi Ver</h2>
+  <label>Miktar (kg)</label><input id='oqty' type='number' min='1' value='1'>
+  <label>Teklifin (TL/kg)</label><input id='oprice' type='number' min='1' step='0.01'>
+  <label>Ad soyad</label><input id='oname'>
+  <label>Şehir</label><input id='ocity'>
+  <label>Telefon / WhatsApp</label><input id='ophone' inputmode='tel'>
+  <button class='save' onclick='submitOffer()'>Teklifi Gönder</button>
+  <button class='close' onclick='offerModal.style.display="none"'>Kapat</button>
+  <div id='omsg' class='msg'></div>
+</div></div>
+
+<div id='saleModal' class='modal'><div class='panel'>
+  <h2>🌾 Tarhana Satışı Ekle</h2>
+  <label>Yönetici PIN</label><input id='spin' type='password' inputmode='numeric'>
+  <label>Satılan miktar</label><input id='sqty' type='number' min='1' value='1'>
+  <label>Müşteri</label><input id='scustomer'>
+  <label>Şehir</label><input id='scity'>
+  <button class='save' onclick='saveSale()'>Satışı Kaydet</button>
+  <button class='close' onclick='saleModal.style.display="none"'>Kapat</button>
+  <div id='smsg' class='msg'></div>
+</div></div>
+
+<div id='settingsModal' class='modal'><div class='panel'>
+  <h2>⚙️ Tarhana Ayarları</h2>
+  <label>Yönetici PIN</label><input id='apin' type='password' inputmode='numeric'>
+  <label>Toplam stok (kg)</label><input id='astock' type='number' min='1'>
+  <label>Başlangıç fiyatı (TL)</label><input id='astart' type='number' min='1' step='0.01'>
+  <label>Her kg sonrası artış (TL)</label><input id='astep' type='number' min='0.01' step='0.01'>
+  <label>İyilik payı (%)</label><input id='aiyilik' type='number' min='0' max='100' step='0.1'>
+  <button class='save' onclick='saveSettings()'>Ayarları Kaydet</button>
+  <button class='close' onclick='settingsModal.style.display="none"'>Kapat</button>
+  <div id='amsg' class='msg'></div>
+</div></div>
+
+<div id='offersAdminModal' class='modal'><div class='panel'>
+  <h2>📥 Bekleyen Teklifler</h2>
+  <label>Yönetici PIN</label><input id='opin' type='password' inputmode='numeric'>
+  <button class='save' onclick='loadOffers()'>Teklifleri Göster</button>
+  <div id='offerList'></div>
+  <button class='close' onclick='offersAdminModal.style.display="none"'>Kapat</button>
+  <div id='ofmsg' class='msg'></div>
+</div></div>
+
+<script>
+const SB='https://dwiiacwamuzluhhztlor.supabase.co',
+KEY='sb_publishable_ZOLAzCg-cqqvqKnGyMbS0w_BR85mySR',
+H={apikey:KEY,Authorization:'Bearer '+KEY,'Content-Type':'application/json'};
+
+let c={initial_stock_kg:500,sold_kg:0,starting_price:250,price_step:1,iyilik_percent:10};
+let causes=[];
+let choiceToken=new URLSearchParams(location.search).get('iyilik');
+
+async function load(){
+  let r=await fetch(SB+'/rest/v1/tarhana_campaign?id=eq.1&select=*',{headers:H}).then(x=>x.json());
+  if(r[0])c=r[0];
+  render();
+  await loadCauses();
+  if(choiceToken) await loadChoice();
+}
+
+function render(){
+  let p=Number(c.starting_price)+Number(c.sold_kg)*Number(c.price_step),
+      rem=c.initial_stock_kg-c.sold_kg;
+  price.innerHTML='₺'+p.toLocaleString('tr-TR')+' <small style="font-size:18px">/ kg</small>';
+  sold.textContent=c.sold_kg+' kg';
+  remain.textContent=rem+' kg';
+  fill.style.width=(c.sold_kg/c.initial_stock_kg*100)+'%';
+  progress.textContent=c.sold_kg+' kg satıldı · '+rem+' kg kaldı';
+  ruleText.textContent='Başlangıç ₺'+Number(c.starting_price).toLocaleString('tr-TR')+
+    ' · Her 1 kg satıştan sonra +₺'+Number(c.price_step).toLocaleString('tr-TR')+
+    ' · İyilik payı %'+Number(c.iyilik_percent).toLocaleString('tr-TR');
+
+  qty.innerHTML='';
+  for(let i=1;i<=Math.min(10,rem);i++) qty.innerHTML+=`<option value="${i}">${i} kg</option>`;
+  astock.value=c.initial_stock_kg;
+  astart.value=c.starting_price;
+  astep.value=c.price_step;
+  aiyilik.value=c.iyilik_percent;
+  calc();
+}
+
+function calc(){
+  let q=Number(qty.value||1),
+      first=Number(c.starting_price)+Number(c.sold_kg)*Number(c.price_step),
+      last=first+(q-1)*Number(c.price_step),
+      t=q*(first+last)/2;
+  orderTotal.textContent='₺'+t.toLocaleString('tr-TR');
+  range.textContent=q===1?'1 kg × ₺'+first.toLocaleString('tr-TR'):
+    q+' kg: ₺'+first.toLocaleString('tr-TR')+' → ₺'+last.toLocaleString('tr-TR');
+}
+
+function openOffer(){
+  oqty.value=qty.value||1;
+  oprice.value=(Number(c.starting_price)+Number(c.sold_kg)*Number(c.price_step)).toFixed(0);
+  omsg.textContent='';
+  offerModal.style.display='block';
+}
+
+async function submitOffer(){
+  omsg.textContent='Gönderiliyor…';
+  let body={
+    p_quantity_kg:Number(oqty.value),
+    p_offer_unit_price:Number(oprice.value),
+    p_customer_name:oname.value,
+    p_city:ocity.value,
+    p_phone:ophone.value
+  };
+  let r=await fetch(SB+'/rest/v1/rpc/submit_tarhana_offer',{method:'POST',headers:H,body:JSON.stringify(body)});
+  omsg.textContent=r.ok?'✅ Teklifin alındı. Onay bekliyor.':'❌ Teklif gönderilemedi. Bilgileri kontrol et.';
+}
+
+function choiceLink(token){
+  return location.origin+location.pathname+'?iyilik='+encodeURIComponent(token);
+}
+
+async function copyText(text,el){
+  try{
+    await navigator.clipboard.writeText(text);
+    if(el) el.textContent='✅ Link kopyalandı';
+  }catch(e){
+    if(el) el.textContent='Linki seçip kopyala: '+text;
+  }
+}
+
+function showAdminChoiceLink(container,data){
+  const link=choiceLink(data.iyilik_choice_token);
+  container.innerHTML=
+    `✅ Satış kaydedildi.<br>💚 İyilik Payı: <b>₺${Number(data.iyilik_pay).toLocaleString('tr-TR')}</b>`+
+    `<div class="linkBox">${link}</div>`+
+    `<button class="copyBtn" id="copySaleLink">📋 Müşteri seçim linkini kopyala</button>`;
+  document.getElementById('copySaleLink').onclick=()=>copyText(link,document.getElementById('copySaleLink'));
+}
+
+async function saveSale(){
+  smsg.textContent='Kaydediliyor…';
+  let body={
+    p_pin:spin.value,
+    p_quantity_kg:Number(sqty.value),
+    p_customer_name:scustomer.value||null,
+    p_city:scity.value||null
+  };
+  let r=await fetch(SB+'/rest/v1/rpc/add_tarhana_sale',{method:'POST',headers:H,body:JSON.stringify(body)});
+  if(r.ok){
+    let data=await r.json();
+    showAdminChoiceLink(smsg,data);
+    await load();
+  }else{
+    let e=await r.json().catch(()=>null);
+    smsg.textContent='❌ '+(e?.message||'Kayıt yapılamadı.');
+  }
+}
+
+async function saveSettings(){
+  amsg.textContent='Kaydediliyor…';
+  let body={
+    p_pin:apin.value,
+    p_initial_stock_kg:Number(astock.value),
+    p_starting_price:Number(astart.value),
+    p_price_step:Number(astep.value),
+    p_iyilik_percent:Number(aiyilik.value)
+  };
+  let r=await fetch(SB+'/rest/v1/rpc/update_tarhana_campaign_settings',{method:'POST',headers:H,body:JSON.stringify(body)});
+  if(r.ok){
+    amsg.textContent='✅ Ayarlar kaydedildi.';
+    await load();
+  }else amsg.textContent='❌ Ayarlar kaydedilemedi.';
+}
+
+function openOffersAdmin(){
+  offersAdminModal.style.display='block';
+  offerList.innerHTML='';
+  ofmsg.textContent='';
+}
+
+async function loadOffers(){
+  ofmsg.textContent='Yükleniyor…';
+  let r=await fetch(SB+'/rest/v1/rpc/get_pending_tarhana_offers',{
+    method:'POST',headers:H,body:JSON.stringify({p_pin:opin.value})
+  });
+  if(!r.ok){
+    ofmsg.textContent='❌ PIN hatalı veya teklifler alınamadı.';
+    return;
+  }
+  let arr=await r.json();
+  ofmsg.textContent=arr.length?'':'Bekleyen teklif yok.';
+  offerList.innerHTML=arr.map(o=>
+    `<div class="offerItem">
+      <b>#${o.id} · ${o.customer_name}</b>
+      ${o.quantity_kg} kg · ₺${Number(o.offer_unit_price).toLocaleString('tr-TR')}/kg<br>
+      ${o.city} · ${o.phone}
+      <button class="approve" onclick="decide(${o.id},true)">Onayla ve Satışa Çevir</button>
+      <button class="reject" onclick="decide(${o.id},false)">Reddet</button>
+    </div>`
+  ).join('');
+}
+
+async function decide(id,approve){
+  ofmsg.textContent='İşleniyor…';
+  let r=await fetch(SB+'/rest/v1/rpc/decide_tarhana_offer',{
+    method:'POST',headers:H,
+    body:JSON.stringify({p_pin:opin.value,p_offer_id:id,p_approve:approve})
+  });
+
+  if(r.ok){
+    let data=await r.json();
+    if(approve){
+      const link=choiceLink(data.iyilik_choice_token);
+      ofmsg.innerHTML=
+        `✅ Teklif onaylandı ve satışa dönüştü.<br>💚 İyilik Payı: <b>₺${Number(data.iyilik_pay).toLocaleString('tr-TR')}</b>`+
+        `<div class="linkBox">${link}</div>`+
+        `<button class="copyBtn" id="copyOfferLink">📋 Müşteri seçim linkini kopyala</button>`;
+      document.getElementById('copyOfferLink').onclick=()=>copyText(link,document.getElementById('copyOfferLink'));
+    }else{
+      ofmsg.textContent='✅ Teklif reddedildi.';
+    }
+    await load();
+    if(!approve) await loadOffers();
+  }else{
+    let e=await r.json().catch(()=>null);
+    ofmsg.textContent='❌ '+(e?.message||'İşlem yapılamadı.');
+  }
+}
+
+async function loadCauses(){
+  let r=await fetch(SB+'/rest/v1/rpc/get_iyilik_causes',{method:'POST',headers:H,body:'{}'});
+  if(!r.ok) return;
+  causes=await r.json();
+
+  causeTotals.innerHTML=causes.map(x=>
+    `<div class="cause">
+      <div class="causeTop">
+        <div class="causeTitle">${x.emoji} ${x.title}</div>
+        <div class="causeAmount">₺${Number(x.total_amount||0).toLocaleString('tr-TR')}</div>
+      </div>
+      <div class="causeDesc">${x.description||''} · ${Number(x.support_count||0)} destek</div>
+    </div>`
+  ).join('');
+}
+
+async function loadChoice(){
+  choiceCard.style.display='block';
+  choiceStatus.innerHTML='Yükleniyor…';
+
+  let r=await fetch(SB+'/rest/v1/rpc/get_iyilik_choice',{
+    method:'POST',headers:H,body:JSON.stringify({p_token:choiceToken})
+  });
+
+  if(!r.ok){
+    choiceStatus.innerHTML='<div class="successBox">❌ Bu seçim bağlantısı geçerli değil.</div>';
+    choiceOptions.innerHTML='';
+    return;
+  }
+
+  let data=await r.json();
+  choiceAmount.textContent='₺'+Number(data.amount).toLocaleString('tr-TR');
+
+  if(data.allocated){
+    choiceStatus.innerHTML=`<div class="successBox">✅ İyilik payın <b>${data.cause_title}</b> alanına yönlendirildi. Teşekkür ederiz.</div>`;
+    choiceOptions.innerHTML='';
+    return;
+  }
+
+  choiceStatus.innerHTML='';
+  choiceOptions.innerHTML=causes.map(x=>
+    `<button class="cause canChoose" onclick="allocateChoice('${x.slug}')">
+      <div class="causeTop">
+        <div class="causeTitle">${x.emoji} ${x.title}</div>
+        <div>Seç →</div>
+      </div>
+      <div class="causeDesc">${x.description||''}</div>
+    </button>`
+  ).join('');
+
+  choiceCard.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+async function allocateChoice(slug){
+  if(!confirm('İyilik payını bu alana yönlendirmek istiyor musun? Bu seçim daha sonra değiştirilemez.')) return;
+
+  choiceStatus.innerHTML='Kaydediliyor…';
+  let r=await fetch(SB+'/rest/v1/rpc/allocate_iyilik_choice',{
+    method:'POST',headers:H,
+    body:JSON.stringify({p_token:choiceToken,p_cause_slug:slug})
+  });
+
+  if(r.ok){
+    let data=await r.json();
+    choiceStatus.innerHTML=`<div class="successBox">✅ ₺${Number(data.amount).toLocaleString('tr-TR')} İyilik Payın <b>${data.cause_title}</b> alanına yönlendirildi. İyiliğin için teşekkür ederiz. 💚</div>`;
+    choiceOptions.innerHTML='';
+    await loadCauses();
+  }else{
+    let e=await r.json().catch(()=>null);
+    choiceStatus.innerHTML='<div class="successBox">❌ '+(e?.message||'Seçim kaydedilemedi.')+'</div>';
+  }
+}
+
+load();
+</script>
+</body>
+</html>
