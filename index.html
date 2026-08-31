@@ -344,20 +344,20 @@ function orderMatchesFilter(o){
 }
 let salesReportDays=7;
 function orderCreatedWithinDays(o,days){
-  if(!o.created_at)return false;
-  const d=new Date(o.created_at),now=new Date();
+  const stamp=o.approved_at||o.created_at;
+  if(!stamp)return false;
+  const d=new Date(stamp),now=new Date();
   if(days===1)return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth()&&d.getDate()===now.getDate();
   const start=new Date(now);start.setHours(0,0,0,0);start.setDate(start.getDate()-(days-1));
   return d>=start&&d<=now;
 }
 function updateSalesReport(){
-  const rows=(adminOrderRows||[]).filter(o=>o.status!=='cancelled'&&orderCreatedWithinDays(o,salesReportDays));
-  const approved=rows.filter(o=>o.status==='approved');
+  const rows=(adminOrderRows||[]).filter(o=>o.status==='approved'&&orderCreatedWithinDays(o,salesReportDays));
   const revenue=rows.reduce((s,o)=>s+Number(o.total_amount||0),0);
-  const goodness=approved.reduce((s,o)=>s+Number(o.charity_amount||0),0);
+  const goodness=rows.reduce((s,o)=>s+Number(o.charity_amount||0),0);
   const qty=rows.reduce((s,o)=>s+Number(o.quantity||0),0);
   $('salesReportTotals').innerHTML='<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px">'+
-    '<div><b>'+rows.length+'</b><div class="muted">Sipariş</div></div>'+
+    '<div><b>'+rows.length+'</b><div class="muted">Onaylı sipariş</div></div>'+
     '<div><b>'+fmt.format(revenue)+' ₺</b><div class="muted">Ciro</div></div>'+
     '<div><b>'+fmt.format(goodness)+' ₺</b><div class="muted">Onaylı iyilik payı</div></div>'+
     '<div><b>'+fmt.format(qty)+'</b><div class="muted">Satılan miktar</div></div></div>';
@@ -410,10 +410,11 @@ function updateAdminOrderSummary(){
     const d=new Date(o.created_at);
     return d.getFullYear()===yy&&d.getMonth()===mm&&d.getDate()===dd;
   });
-  const todayCount=todayRows.length;
-  const todayRevenue=todayRows.filter(o=>o.status!=='cancelled').reduce((s,o)=>s+Number(o.total_amount||0),0);
-  const todayGoodness=todayRows.filter(o=>o.status==='approved').reduce((s,o)=>s+Number(o.charity_amount||0),0);
-  $('todayOrderStats').textContent=todayCount+' sipariş · '+fmt.format(todayRevenue)+' ₺ ciro · '+fmt.format(todayGoodness)+' ₺ iyilik payı';
+  const approvedToday=todayRows.filter(o=>o.status==='approved');
+  const todayCount=approvedToday.length;
+  const todayRevenue=approvedToday.reduce((s,o)=>s+Number(o.total_amount||0),0);
+  const todayGoodness=approvedToday.reduce((s,o)=>s+Number(o.charity_amount||0),0);
+  $('todayOrderStats').textContent=todayCount+' onaylı sipariş · '+fmt.format(todayRevenue)+' ₺ ciro · '+fmt.format(todayGoodness)+' ₺ iyilik payı';
 }
 function getVisibleAdminOrders(){
   const q=($('adminOrderSearch').value||'').trim().toLocaleLowerCase('tr-TR');
