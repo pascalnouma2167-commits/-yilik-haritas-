@@ -105,6 +105,7 @@ nav{
     <b>Bugün</b>
     <div id="todayOrderStats" class="muted" style="margin-top:6px">0 sipariş · 0 ₺ ciro · 0 ₺ iyilik payı</div>
   </div>
+  <div id="lowStockBox" class="notice" style="margin-top:10px;display:none"></div>
   <div class="notice" style="margin-top:10px">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
       <b>📊 Satış Raporu</b>
@@ -270,6 +271,19 @@ function updateSalesReport(){
 }
 document.querySelectorAll('.salesRangeBtn').forEach(b=>b.onclick=()=>{salesReportDays=Number(b.dataset.days)||7;updateSalesReport()});
 
+const LOW_STOCK_LIMIT=20;
+function updateLowStockWarning(){
+  const lows=(P||[]).filter(p=>Number(p.stock||0)<=LOW_STOCK_LIMIT);
+  if(!lows.length){
+    $('lowStockBox').style.display='block';
+    $('lowStockBox').innerHTML='<b>✅ Stok durumu iyi</b><div class="muted" style="margin-top:5px">20 ve altına düşen ürün yok.</div>';
+    return;
+  }
+  $('lowStockBox').style.display='block';
+  $('lowStockBox').innerHTML='<b>⚠️ Kritik stok uyarısı</b><div class="muted" style="margin-top:5px">20 ve altına düşen ürünler:</div>'+
+    lows.map(p=>'<div style="display:flex;justify-content:space-between;gap:10px;padding-top:7px"><span>'+esc(p.name)+'</span><b>'+fmt.format(Number(p.stock||0))+' '+esc(p.unit||'')+'</b></div>').join('');
+}
+
 function updateAdminOrderSummary(){
   const rows=adminOrderRows||[];
   const pending=rows.filter(o=>o.status==='pending').length;
@@ -386,7 +400,7 @@ window.printOrderLabel=printOrderLabel;
 
 $('adminOrderSearch').oninput=renderAdminOrders;
 document.querySelectorAll('.adminOrderFilter').forEach(b=>b.onclick=()=>{adminOrderFilter=b.dataset.filter||'all';renderAdminOrders()});
-async function loadOrders(){try{const rr=await fetch(EMAIL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'admin_orders',pin:$('pin').value.trim()})}),jj=await rr.json().catch(()=>({}));if(!rr.ok||jj.ok===false)throw new Error(jj.error||'Siparişler alınamadı');adminOrderRows=jj.data||[];adminOrderFilter='all';$('adminOrderSearch').value='';$('adminOrderSummary').style.display='block';$('adminOrderTools').style.display='block';updateAdminOrderSummary();updateSalesReport();renderAdminOrders();amsg('Siparişler yüklendi.')}catch(e){amsg(e.message,true)}}
+async function loadOrders(){try{const rr=await fetch(EMAIL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'admin_orders',pin:$('pin').value.trim()})}),jj=await rr.json().catch(()=>({}));if(!rr.ok||jj.ok===false)throw new Error(jj.error||'Siparişler alınamadı');adminOrderRows=jj.data||[];adminOrderFilter='all';$('adminOrderSearch').value='';$('adminOrderSummary').style.display='block';$('adminOrderTools').style.display='block';updateAdminOrderSummary();updateLowStockWarning();updateSalesReport();renderAdminOrders();amsg('Siparişler yüklendi.')}catch(e){amsg(e.message,true)}}
 async function loadOffers(){try{$('adminOrderTools').style.display='none';$('adminOrderSummary').style.display='none';const rows=await api('admin_offers',{pin:$('pin').value.trim()});$('orders').innerHTML=rows.length?rows.map(o=>'<div class="order"><b>Teklif #'+o.id+' · '+esc(o.product_name)+'</b><div>'+esc(o.customer_name)+' · '+esc(o.city)+'</div><div><b>'+fmt.format(o.offered_unit_price)+' ₺ / '+esc(o.product_unit||'birim')+'</b> · '+fmt.format(o.quantity)+' '+esc(o.product_unit||'')+'</div>'+(o.campaign_title?'<div class="muted" style="margin-top:6px">❤️ '+esc(o.campaign_title)+'</div>':'')+'<span class="status '+esc(o.status)+'">'+esc(o.status)+'</span>'+(o.status==='pending'?'<div class="orderBtns"><button class="btn alt" onclick="decideOffer('+o.id+',false)">Reddet</button><button class="btn" onclick="decideOffer('+o.id+',true)">Teklifi Onayla</button></div>':'')+'</div>').join(''):'<div class="notice">Henüz teklif yok.</div>';amsg('Teklifler yüklendi.')}catch(e){amsg(e.message,true)}}
 async function sendOrderEmail(order_id,event){try{const headers={'Content-Type':'application/json'};if(token)headers.Authorization='Bearer '+token;const r=await fetch(EMAIL_API,{method:'POST',headers,body:JSON.stringify({action:'notify',pin:$('pin').value.trim(),order_id,event})});const j=await r.json().catch(()=>({}));if(!r.ok||j.ok===false)throw new Error(j.error||'E-posta gönderilemedi');return true}catch(e){console.warn('E-posta bildirimi:',e);return false}}
 async function decide(id,approve){try{const r=await api('admin_decide',{pin:$('pin').value.trim(),order_id:id,approve});let mailOk=true;if(approve)mailOk=await sendOrderEmail(id,'approved');amsg(approve?'Sipariş onaylandı. Yeni fiyat '+fmt.format(r.new_price)+' ₺, stok '+fmt.format(r.remaining_stock)+'.'+(mailOk?' E-posta gönderildi.':' E-posta gönderilemedi; sipariş onayı geçerli.'):'Sipariş reddedildi.');await Promise.all([loadOrders(),boot()])}catch(e){amsg(e.message,true)}}
