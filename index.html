@@ -340,6 +340,15 @@ function renderAdminDashboard(orders,settings){
   const activeCampaigns=campaigns.filter(c=>c.active);
   const completed=campaigns.filter(c=>Number(c.target_amount||0)>0&&Number(c.current_amount||0)>=Number(c.target_amount||0));
   const recent=orders.filter(o=>o.status==='approved').sort((a,b)=>new Date(b.approved_at||b.created_at||0)-new Date(a.approved_at||a.created_at||0)).slice(0,5);
+  const now=new Date();
+  const todayApproved=orders.filter(o=>{
+    if(o.status!=='approved')return false;
+    const stamp=o.approved_at||o.created_at;if(!stamp)return false;
+    const d=new Date(stamp);
+    return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth()&&d.getDate()===now.getDate();
+  });
+  const todayRevenue=todayApproved.reduce((s,o)=>s+Number(o.total_amount||0),0);
+  const todayGoodness=todayApproved.reduce((s,o)=>s+Number(o.charity_amount||0),0);
   const el=$('adminDashboard');
   el.style.display='block';
   el.innerHTML=
@@ -349,6 +358,11 @@ function renderAdminDashboard(orders,settings){
       '<div class="notice"><b>'+low.length+'</b><div class="muted">Kritik stok</div></div>'+
       '<div class="notice"><b>'+activeCampaigns.length+'</b><div class="muted">Aktif kampanya</div></div>'+
       '<div class="notice"><b>'+completed.length+'</b><div class="muted">Hedefi tamamlanan</div></div>'+
+    '</div></div>'+
+    '<div class="order"><b>📈 Bugünün Performansı</b><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:10px">'+
+      '<div class="notice"><b>'+todayApproved.length+'</b><div class="muted">Onaylı satış</div></div>'+
+      '<div class="notice"><b>'+fmt.format(todayRevenue)+' ₺</b><div class="muted">Ciro</div></div>'+
+      '<div class="notice"><b>'+fmt.format(todayGoodness)+' ₺</b><div class="muted">İyilik payı</div></div>'+
     '</div></div>'+
     '<div class="order"><b>⚡ Hızlı İşlemler</b><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px">'+
       '<button class="btn alt" onclick="openAdminOrderFilter(&quot;pending&quot;)">🧾 Bekleyenler ('+pending.length+')</button>'+
