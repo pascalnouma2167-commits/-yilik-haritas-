@@ -137,7 +137,7 @@ nav{
   </div>
 </div>
 <div id="orders"></div></div></div>
-<div id="auth" class="sheet"><div class="panel"><div class="top"><h1>Hesabım</h1><button class="close" id="authClose">×</button></div><div id="authLogged" style="display:none"><div class="accountHead"><div><b id="whoName" style="font-size:26px"></b><div id="whoCity" class="muted"></div></div></div><div class="accountInfo"><b>Hesap Bilgileri</b><div id="whoEmail" class="accountEmail"></div></div><button class="btn alt" id="logout" style="width:100%;margin-top:24px">Çıkış Yap</button></div><div id="authForm"><label>Ad Soyad <span class="muted">(kayıt için)</span></label><input id="authName" placeholder="Ad Soyad"><label>Şehir <span class="muted">(kayıt için)</span></label><input id="authCity" value="Zonguldak"><label>E-posta</label><input id="authEmail" type="email" placeholder="ornek@email.com"><label>Şifre</label><input id="authPassword" type="password" minlength="6"><div class="actions"><button class="btn alt" id="signup">Kayıt Ol</button><button class="btn" id="login">Giriş Yap</button></div></div><div id="authMsg"></div></div></div>
+<div id="auth" class="sheet"><div class="panel"><div class="top"><h1>Hesabım</h1><button class="close" id="authClose">×</button></div><div id="authLogged" style="display:none"><div class="accountHead"><div><b id="whoName" style="font-size:26px"></b><div id="whoCity" class="muted"></div></div></div><div class="accountInfo"><b>Hesap Bilgileri</b><div id="whoEmail" class="accountEmail"></div></div><div class="order" style="margin-top:18px"><h3 style="margin-top:0">📦 Siparişim Nerede?</h3><div class="muted">Sipariş numaranı yazarak durumunu takip edebilirsin.</div><div style="display:flex;gap:8px;margin-top:10px"><input id="profileOrderNo" inputmode="numeric" placeholder="Örn. 15" style="margin:0"><button class="btn" id="profileOrderTrackBtn" style="white-space:nowrap">Sorgula</button></div><div id="profileOrderTrackResult" style="margin-top:10px"></div></div><button class="btn alt" id="logout" style="width:100%;margin-top:24px">Çıkış Yap</button></div><div id="authForm"><label>Ad Soyad <span class="muted">(kayıt için)</span></label><input id="authName" placeholder="Ad Soyad"><label>Şehir <span class="muted">(kayıt için)</span></label><input id="authCity" value="Zonguldak"><label>E-posta</label><input id="authEmail" type="email" placeholder="ornek@email.com"><label>Şifre</label><input id="authPassword" type="password" minlength="6"><div class="actions"><button class="btn alt" id="signup">Kayıt Ol</button><button class="btn" id="login">Giriş Yap</button></div></div><div id="authMsg"></div></div></div>
 <div id="mygood" class="sheet"><div class="panel"><div class="top"><h1>İyiliklerim</h1><button class="close" id="myClose">×</button></div><div id="myBody"></div></div></div>
 <div id="campaignSheet" class="sheet"><div class="panel"><div class="top"><div><h1 id="cTitle">Kampanya</h1><p id="cDesc" class="muted"></p></div><button class="close" id="cClose">×</button></div><div id="cBody"></div></div></div>
 <nav><div class="navbtn" id="navHome">🏠<br>Ana Sayfa</div><div class="navbtn" id="navProducts">🛍️<br>Ürünler</div><div class="navbtn" id="navCampaigns">❤️<br>Kampanyalar</div><div class="navbtn" id="navGood">🌱<br>İyiliklerim</div><div class="navbtn" id="navProfile">👤<br>Profil</div></nav>
@@ -220,6 +220,78 @@ $('signup').onclick=async()=>{try{const r=await api('signup',{full_name:$('authN
 $('login').onclick=async()=>{try{const r=await api('login',{email:$('authEmail').value.trim(),password:$('authPassword').value});token=r.access_token||'';localStorage.setItem('iyilik_token',token);user=r.user;renderUser();authMsg('Giriş yapıldı.')}catch(e){authMsg(e.message,true)}};
 $('logout').onclick=()=>{token='';user=null;localStorage.removeItem('iyilik_token');renderUser();authMsg('Çıkış yapıldı.')};
 $('navGood').onclick=async()=>{$('mygood').classList.add('show');if(!user){$('myBody').innerHTML='<div class="notice">İyiliklerini görmek için önce Profil bölümünden giriş yap.</div>';return}try{const r=await api('my_goodness'),orders=r.orders||[],offers=r.offers||[],approved=orders.filter(o=>o.status==='approved'),approvedCount=Number(r.approved_count||approved.length||0),campaignCount=new Set(approved.map(o=>o.app_campaigns?.title).filter(Boolean)).size,total=Number(r.total_goodness||0),levels=[{n:1,name:'İyilik Tohumu',icon:'🌱'},{n:5,name:'İyilik Filizi',icon:'🌿'},{n:10,name:'İyilik Fidanı',icon:'🌱'},{n:25,name:'İyilik Ağacı',icon:'🌳'},{n:50,name:'İyilik Ormanı',icon:'🌲'}],earned=[...levels].reverse().find(x=>approvedCount>=x.n),next=levels.find(x=>approvedCount<x.n),badge=earned||{name:'İlk iyiliğini bekliyor',icon:'🔒'},progressText=next?(next.n-approvedCount)+' alışveriş sonra '+next.name:'En yüksek rozet seviyesindesin!',pct=next?Math.max(0,Math.min(100,approvedCount/next.n*100)):100,statusTr={approved:'Onaylandı',pending:'Onay bekliyor',rejected:'Reddedildi',cancelled:'İptal edildi'},fulfillTr={awaiting_approval:'Onay / hazırlık bekliyor',preparing:'Hazırlanıyor',shipped:'Kargoya verildi',delivered:'Teslim edildi',cancelled:'İptal edildi'},badgesHtml=levels.map(l=>'<div class="earnedBadge '+(approvedCount>=l.n?'':'locked')+'"><div class="ico">'+(approvedCount>=l.n?l.icon:'🔒')+'</div><b>'+esc(l.name)+'</b></div>').join('');window.lastGoodness={total,approvedCount,campaignCount,badge,user};window.myGoodnessOrders=orders;$('myBody').innerHTML='<div class="identityCard"><div class="identityTop"><div class="identityIcon">'+badge.icon+'</div><div><div class="identityName">'+esc(user.full_name||'İyilik Dostu')+'</div><div class="identityMeta">İyilik Kimliği · '+esc(user.city||'Türkiye')+'</div></div></div><div class="goodTotal">'+fmt.format(total)+' ₺</div><div class="muted">Alışverişlerinden oluşan toplam iyilik payı</div><button class="btn shareBtn" onclick="shareCertificate()">💚 İyilik Sertifikamı Paylaş</button><div class="certificateHint">Sertifika kişisel bilgilerini değil, adını ve iyilik istatistiklerini paylaşır.</div></div><div class="myStats"><div class="myStat"><b>'+approvedCount+'</b><span>Onaylanan alışveriş</span></div><div class="myStat"><b>'+campaignCount+'</b><span>Desteklenen kampanya</span></div></div><div class="badgeCard"><div class="badgeIcon">'+badge.icon+'</div><div class="badgeTitle">'+badge.name+'</div><div class="muted">'+(earned?'Kazandığın mevcut iyilik rozeti.':'İlk onaylı alışverişinde açılacak.')+'</div><div style="height:10px;background:#dfeedd;border-radius:99px;overflow:hidden;margin:16px 0 10px"><i style="display:block;height:100%;width:'+pct+'%;background:var(--g)"></i></div><div class="muted"><b style="color:var(--g)">'+progressText+'</b></div></div><div class="goodSectionTitle"><b>🌱 İyilik Rozetlerin</b></div><div class="earnedBadges">'+badgesHtml+'</div><div class="goodSectionTitle"><b>❤️ Desteklediğin Kampanyalar</b></div>'+(()=>{const m={};approved.forEach(o=>{const t=o.app_campaigns?.title||'Kampanya belirtilmedi';if(!m[t])m[t]={amount:0,count:0};m[t].amount+=Number(o.charity_amount||0);m[t].count++});const e=Object.entries(m);return e.length?e.sort((a,b)=>b[1].amount-a[1].amount).map(([t,v])=>'<div class="goodCampaignCard"><div class="goodCampaignTop"><b>❤️ '+esc(t)+'</b><span class="goodCampaignAmount">'+fmt.format(v.amount)+' ₺</span></div><div class="goodCampaignMeta">'+v.count+' onaylı alışverişten oluşan katkın</div></div>').join(''):'<div class="notice">Henüz onaylanmış kampanya katkın yok.</div>'})()+'<div class="goodSectionTitle"><b>🤝 Tekliflerin</b></div>'+(offers.length?offers.map(o=>'<div class="order"><b>Teklif #'+o.id+' · '+esc(o.app_products?.name||'Ürün')+'</b><div><b>'+fmt.format(o.offered_unit_price)+' ₺ / '+esc(o.app_products?.unit||'birim')+'</b> · '+fmt.format(o.quantity)+' '+esc(o.app_products?.unit||'')+'</div><span class="status '+esc(o.status)+'">'+esc(statusTr[o.status]||o.status)+'</span>'+(o.status==='approved'?'<div class="notice" style="margin-top:10px">💚 Bu alışverişle <b>'+fmt.format(Number(o.offered_unit_price||0)*Number(o.quantity||0)*(window.pct||10)/100)+' ₺</b> iyilik oluşturdun.</div>':'')+(o.app_campaigns?.title?'<div class="muted" style="margin-top:8px">❤️ '+esc(o.app_campaigns.title)+'</div>':'')+'</div>').join(''):'<div class="notice">Henüz hesabına bağlı teklif yok.</div>')+'<div class="goodSectionTitle"><b>📦 Siparişlerin ve Etkin</b></div>'+(orders.length?orders.map(o=>{const d=new Date(o.approved_at||o.created_at),dateText=isNaN(d)?'':d.toLocaleDateString('tr-TR',{day:'2-digit',month:'long',year:'numeric'});return '<div class="order orderHistoryCard"><div class="orderHistoryTop"><div><b>Sipariş #'+o.id+' · '+esc(o.app_products?.name||'Ürün')+'</b>'+(dateText?'<div class="orderDate">📅 '+esc(dateText)+'</div>':'')+'</div><span class="status '+esc(o.status)+'">'+esc(statusTr[o.status]||o.status)+'</span></div><div class="orderHistoryGrid"><div><span>Ödenen tutar</span><b>'+fmt.format(o.total_amount)+' ₺</b></div><div><span>Oluşan iyilik</span><b class="goodAmount">'+fmt.format(o.charity_amount)+' ₺</b></div></div>'+(o.app_campaigns?.title?'<div class="orderCampaign">❤️ '+esc(o.app_campaigns.title)+'</div>':'')+(o.status==='pending'?'<button class="btn alt cancelOrderBtn" onclick="cancelMyOrder('+o.id+')">Siparişi İptal Et</button>':'')+(o.status==='approved'?'<div class="deliveryTrack"><b>📦 '+esc(fulfillTr[o.fulfillment_status]||'Hazırlık bekliyor')+'</b>'+(o.tracking_code?'<div class="muted">Kargo takip kodu: '+esc(o.tracking_code)+'</div>':'')+(o.delivery_method?'<div class="muted">Teslimat: '+esc(o.delivery_method)+'</div>':'')+'</div><div class="orderImpact">💚 Bu siparişle <b>'+fmt.format(o.charity_amount)+' ₺</b> iyilik oluşturdun.</div>'+(o.fulfillment_status==='delivered'?'<button class="btn repeatOrderBtn" onclick="repeatMyOrder('+o.id+')">🔁 Tekrar Sipariş Ver</button>':''):'')+'</div>'}).join(''):'<div class="notice">Henüz hesabına bağlı sipariş yok.</div>')}catch(e){$('myBody').innerHTML='<div class="notice bad">'+esc(e.message)+'</div>'}};
+
+function trackedOrderStep(o){
+  if(o.status==='cancelled')return -1;
+  if(o.status==='pending')return 0;
+  if(o.status==='approved'&&(!o.fulfillment_status||o.fulfillment_status==='awaiting_approval'))return 1;
+  if(o.fulfillment_status==='preparing')return 2;
+  if(o.fulfillment_status==='shipped')return 3;
+  if(o.fulfillment_status==='delivered')return 4;
+  return 0;
+}
+function renderTrackedOrder(o){
+  const box=$('profileOrderTrackResult');
+  if(!o){box.innerHTML='<div class="notice bad">Bu hesapta bu numarayla eşleşen sipariş bulunamadı.</div>';return}
+  if(o.status==='cancelled'){
+    box.innerHTML='<div class="notice"><b>❌ Sipariş #'+o.id+' iptal edildi.</b><div class="muted" style="margin-top:5px">Bu sipariş artık işleme alınmayacak.</div></div>';
+    return;
+  }
+  const step=trackedOrderStep(o);
+  const labels=['Talep alındı','Onaylandı','Hazırlanıyor','Kargoya verildi','Teslim edildi'];
+  const timeline=labels.map((x,i)=>{
+    const done=i<step, current=i===step;
+    return '<div style="display:flex;gap:9px;align-items:flex-start;padding:7px 0"><span style="font-size:18px">'+(done?'✅':current?'🟢':'⚪')+'</span><div><b>'+esc(x)+'</b>'+(current?'<div class="muted">Şu anki durum</div>':'')+'</div></div>';
+  }).join('');
+  let shipping='';
+  if(o.tracking_code){
+    const raw=String(o.tracking_code);
+    const parts=raw.split('|').map(x=>x.trim()).filter(Boolean);
+    shipping='<div class="notice" style="margin-top:10px"><b>🚚 Kargo bilgisi</b>'+
+      (parts.length>1?'<div class="muted" style="margin-top:5px">Firma: '+esc(parts[0])+'</div><div class="muted">Takip kodu: '+esc(parts.slice(1).join(' | '))+'</div>':'<div class="muted" style="margin-top:5px">Takip kodu: '+esc(raw)+'</div>')+
+      '</div>';
+  }
+  const cancel=o.status==='pending'
+    ? '<button class="btn alt" style="width:100%;margin-top:10px;color:#a32626;border-color:#efc4c4" onclick="cancelTrackedOrder('+o.id+')">Siparişi İptal Et</button>'
+    : '';
+  box.innerHTML='<div class="order"><div style="display:flex;justify-content:space-between;gap:8px"><b>Sipariş #'+o.id+'</b><b>'+fmt.format(Number(o.total_amount||0))+' ₺</b></div>'+
+    '<div class="muted" style="margin-top:4px">'+esc(o.app_products?.name||o.product_name||'Ürün')+'</div>'+
+    '<div style="margin-top:10px">'+timeline+'</div>'+shipping+cancel+'</div>';
+}
+async function lookupProfileOrder(){
+  const no=Number(($('profileOrderNo').value||'').replace(/\D/g,''));
+  if(!no){$('profileOrderTrackResult').innerHTML='<div class="notice bad">Geçerli bir sipariş numarası yaz.</div>';return}
+  const btn=$('profileOrderTrackBtn');
+  btn.disabled=true;btn.textContent='Bakılıyor…';
+  try{
+    const r=await api('my_goodness');
+    const o=(r.orders||[]).find(x=>Number(x.id)===no);
+    renderTrackedOrder(o);
+  }catch(e){
+    $('profileOrderTrackResult').innerHTML='<div class="notice bad">'+esc(e.message)+'</div>';
+  }finally{
+    btn.disabled=false;btn.textContent='Sorgula';
+  }
+}
+async function cancelTrackedOrder(id){
+  if(!confirm('Bu siparişi iptal etmek istediğine emin misin?'))return;
+  try{
+    await api('cancel_order',{order_id:id});
+    let mailOk=false;
+    try{
+      const headers={'Content-Type':'application/json'};
+      if(token)headers.Authorization='Bearer '+token;
+      const rr=await fetch(EMAIL_API,{method:'POST',headers,body:JSON.stringify({action:'notify_cancelled',order_id:id})});
+      const jj=await rr.json().catch(()=>({}));
+      mailOk=rr.ok&&jj.ok!==false;
+    }catch{}
+    alert(mailOk?'Siparişin iptal edildi. İptal bilgisi e-posta adresine gönderildi.':'Siparişin iptal edildi. E-posta bildirimi gönderilemedi.');
+    await lookupProfileOrder();
+  }catch(e){alert('Sipariş iptal edilemedi: '+e.message)}
+}
+$('profileOrderTrackBtn').onclick=lookupProfileOrder;
+$('profileOrderNo').addEventListener('keydown',e=>{if(e.key==='Enter')lookupProfileOrder()});
+window.cancelTrackedOrder=cancelTrackedOrder;
 </script><script>function repeatMyOrder(id){
   const o=(window.myGoodnessOrders||[]).find(x=>Number(x.id)===Number(id));
   if(!o){alert('Eski sipariş bilgisi bulunamadı.');return}
