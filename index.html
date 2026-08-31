@@ -278,6 +278,12 @@ function renderAdminDashboard(orders,settings){
       '<div class="notice"><b>'+activeCampaigns.length+'</b><div class="muted">Aktif kampanya</div></div>'+
       '<div class="notice"><b>'+completed.length+'</b><div class="muted">Hedefi tamamlanan</div></div>'+
     '</div></div>'+
+    '<div class="order"><b>⚡ Hızlı İşlemler</b><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px">'+
+      '<button class="btn alt" onclick="openAdminOrderFilter(&quot;pending&quot;)">🧾 Bekleyenler ('+pending.length+')</button>'+
+      '<button class="btn alt" onclick="openAdminOrderFilter(&quot;preparing&quot;)">📦 Hazırlananlar ('+orders.filter(o=>o.status==='approved'&&o.fulfillment_status==='preparing').length+')</button>'+
+      '<button class="btn alt" onclick="openAdminOrderFilter(&quot;shipped&quot;)">🚚 Kargodakiler ('+orders.filter(o=>o.status==='approved'&&o.fulfillment_status==='shipped').length+')</button>'+
+      '<button class="btn alt" onclick="openAdminStockSettings()">⚠️ Stokları Aç ('+low.length+')</button>'+
+    '</div></div>'+
     '<div class="order"><b>⚠️ Dikkat Gerektirenler</b>'+
       (pending.length||low.length
         ? (pending.length?'<div class="notice" style="margin-top:10px">🧾 <b>'+pending.length+' sipariş</b> onay bekliyor. <button class="btn alt" style="width:100%;margin-top:8px" onclick="openPendingOrders()">Bekleyen Siparişleri Aç</button></div>':'')+
@@ -310,13 +316,21 @@ async function loadAdminDashboard(){
   }catch(e){amsg(e.message,true)}
   finally{btn.disabled=false;btn.textContent='📌 Yönetici Özetini Getir'}
 }
-async function openPendingOrders(){
+async function openAdminOrderFilter(filter){
   await loadOrders();
-  adminOrderFilter='pending';
+  adminOrderFilter=filter||'all';
   renderAdminOrders();
   $('orders').scrollIntoView({behavior:'smooth',block:'start'});
 }
+async function openPendingOrders(){return openAdminOrderFilter('pending')}
+async function openAdminStockSettings(){
+  await loadSettings();
+  const target=$('settingsPanel');
+  if(target)target.scrollIntoView({behavior:'smooth',block:'start'});
+}
 window.openPendingOrders=openPendingOrders;
+window.openAdminOrderFilter=openAdminOrderFilter;
+window.openAdminStockSettings=openAdminStockSettings;
 
 const fulfillAdminTr={awaiting_approval:'Hazırlık bekliyor',preparing:'Hazırlanıyor',shipped:'Kargoya verildi',delivered:'Teslim edildi',cancelled:'İptal edildi'};
 let adminOrderRows=[],adminOrderFilter='all';
