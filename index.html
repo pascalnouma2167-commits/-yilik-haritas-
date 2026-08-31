@@ -118,6 +118,10 @@ nav{
     <button class="btn alt adminOrderFilter" data-filter="cancelled" style="white-space:nowrap;padding:10px 12px">İptal Edilen</button>
   </div>
   <div id="adminOrderCount" class="muted" style="margin-top:8px"></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+    <button class="btn alt" id="downloadOrdersCsv">⬇️ Görünenleri CSV İndir</button>
+    <button class="btn alt" id="printVisibleLabels">🏷️ Görünen Etiketleri Yazdır</button>
+  </div>
 </div>
 <div id="orders"></div></div></div>
 <div id="auth" class="sheet"><div class="panel"><div class="top"><h1>Hesabım</h1><button class="close" id="authClose">×</button></div><div id="authLogged" style="display:none"><div class="accountHead"><div><b id="whoName" style="font-size:26px"></b><div id="whoCity" class="muted"></div></div></div><div class="accountInfo"><b>Hesap Bilgileri</b><div id="whoEmail" class="accountEmail"></div></div><button class="btn alt" id="logout" style="width:100%;margin-top:24px">Çıkış Yap</button></div><div id="authForm"><label>Ad Soyad <span class="muted">(kayıt için)</span></label><input id="authName" placeholder="Ad Soyad"><label>Şehir <span class="muted">(kayıt için)</span></label><input id="authCity" value="Zonguldak"><label>E-posta</label><input id="authEmail" type="email" placeholder="ornek@email.com"><label>Şifre</label><input id="authPassword" type="password" minlength="6"><div class="actions"><button class="btn alt" id="signup">Kayıt Ol</button><button class="btn" id="login">Giriş Yap</button></div></div><div id="authMsg"></div></div></div>
@@ -246,22 +250,94 @@ function updateAdminOrderSummary(){
   const todayGoodness=todayRows.filter(o=>o.status==='approved').reduce((s,o)=>s+Number(o.charity_amount||0),0);
   $('todayOrderStats').textContent=todayCount+' sipariş · '+fmt.format(todayRevenue)+' ₺ ciro · '+fmt.format(todayGoodness)+' ₺ iyilik payı';
 }
-function renderAdminOrders(){
+function getVisibleAdminOrders(){
   const q=($('adminOrderSearch').value||'').trim().toLocaleLowerCase('tr-TR');
-  const rows=adminOrderRows.filter(o=>{
+  return adminOrderRows.filter(o=>{
     if(!orderMatchesFilter(o))return false;
     if(!q)return true;
     const hay=[o.id,o.customer_name,o.product_name,o.city,o.phone,o.customer_email,o.campaign_title,o.order_note].map(v=>String(v??'')).join(' ').toLocaleLowerCase('tr-TR');
     return hay.includes(q.replace(/^#/,''));
   });
+}
+function renderAdminOrders(){
+  const rows=getVisibleAdminOrders();
   $('adminOrderCount').textContent=rows.length+' sipariş gösteriliyor';
   document.querySelectorAll('.adminOrderFilter').forEach(b=>{
     const active=b.dataset.filter===adminOrderFilter;
     b.style.fontWeight=active?'800':'600';
     b.style.opacity=active?'1':'.72';
   });
-  $('orders').innerHTML=rows.length?rows.map(o=>'<div class="order"><b>#'+o.id+' · '+esc(o.product_name)+'</b><div>'+esc(o.customer_name)+' · '+esc(o.city)+'</div><div>'+fmt.format(o.total_amount)+' ₺ · İyilik '+fmt.format(o.charity_amount)+' ₺ · '+esc(o.status==='cancelled'?'Müşteri tarafından iptal edildi':o.status)+'</div>'+(o.phone?'<div class="muted">📞 '+esc(o.phone)+'</div>':'')+(o.delivery_address?'<div class="muted">📍 '+esc(o.delivery_address)+'</div>':'')+(o.order_note?'<div class="notice" style="margin-top:8px">📝 <b>Sipariş notu:</b> '+esc(o.order_note)+'</div>':'')+(o.campaign_title?'<div class="muted" style="margin-top:6px">❤️ '+esc(o.campaign_title)+'</div>':'')+(o.status==='pending'?'<div class="orderBtns"><button class="btn alt" onclick="decide('+o.id+',false)">Reddet</button><button class="btn" onclick="decide('+o.id+',true)">Onayla</button></div>':'')+(o.status==='approved'?'<div class="fulfillBox"><b>📦 '+esc(fulfillAdminTr[o.fulfillment_status]||'Hazırlık bekliyor')+'</b>'+(o.tracking_code?'<div class="muted">Takip: '+esc(o.tracking_code)+'</div>':'')+'<div class="fulfillBtns">'+((!o.fulfillment_status||o.fulfillment_status==='awaiting_approval')?'<button class="btn" onclick="setFulfillment('+o.id+',\'preparing\')">Hazırlamaya Başla</button>':o.fulfillment_status==='preparing'?'<button class="btn" onclick="shipOrder('+o.id+')">Kargoya Ver</button>':o.fulfillment_status==='shipped'?'<button class="btn" onclick="setFulfillment('+o.id+',\'delivered\')">Teslim Edildi</button>':o.fulfillment_status==='delivered'?'<div class="muted" style="margin-top:8px">✅ Sipariş süreci tamamlandı.</div>':'')+'</div></div>':'')+'</div>').join(''):'<div class="notice">Bu arama veya filtreye uygun sipariş bulunamadı.</div>';
+  $('orders').innerHTML=rows.length?rows.map(o=>'<div class="order"><b>#'+o.id+' · '+esc(o.product_name)+'</b><div>'+esc(o.customer_name)+' · '+esc(o.city)+'</div><div>'+fmt.format(o.total_amount)+' ₺ · İyilik '+fmt.format(o.charity_amount)+' ₺ · '+esc(o.status==='cancelled'?'Müşteri tarafından iptal edildi':o.status)+'</div>'+(o.phone?'<div class="muted">📞 '+esc(o.phone)+'</div>':'')+(o.delivery_address?'<div class="muted">📍 '+esc(o.delivery_address)+'</div>':'')+(o.order_note?'<div class="notice" style="margin-top:8px">📝 <b>Sipariş notu:</b> '+esc(o.order_note)+'</div>':'')+(o.campaign_title?'<div class="muted" style="margin-top:6px">❤️ '+esc(o.campaign_title)+'</div>':'')+(o.status!=='cancelled'?'<div style="margin-top:8px"><button class="btn alt" style="padding:9px 12px" onclick="printOrderLabel('+o.id+')">🏷️ Kargo Etiketi</button></div>':'')+(o.status==='pending'?'<div class="orderBtns"><button class="btn alt" onclick="decide('+o.id+',false)">Reddet</button><button class="btn" onclick="decide('+o.id+',true)">Onayla</button></div>':'')+(o.status==='approved'?'<div class="fulfillBox"><b>📦 '+esc(fulfillAdminTr[o.fulfillment_status]||'Hazırlık bekliyor')+'</b>'+(o.tracking_code?'<div class="muted">Takip: '+esc(o.tracking_code)+'</div>':'')+'<div class="fulfillBtns">'+((!o.fulfillment_status||o.fulfillment_status==='awaiting_approval')?'<button class="btn" onclick="setFulfillment('+o.id+',\'preparing\')">Hazırlamaya Başla</button>':o.fulfillment_status==='preparing'?'<button class="btn" onclick="shipOrder('+o.id+')">Kargoya Ver</button>':o.fulfillment_status==='shipped'?'<button class="btn" onclick="setFulfillment('+o.id+',\'delivered\')">Teslim Edildi</button>':o.fulfillment_status==='delivered'?'<div class="muted" style="margin-top:8px">✅ Sipariş süreci tamamlandı.</div>':'')+'</div></div>':'')+'</div>').join(''):'<div class="notice">Bu arama veya filtreye uygun sipariş bulunamadı.</div>';
 }
+
+function csvCell(v){
+  const s=String(v??'').replace(/\r?\n/g,' ');
+  return '"'+s.replace(/"/g,'""')+'"';
+}
+function orderStatusText(o){
+  if(o.status==='cancelled')return 'Müşteri tarafından iptal edildi';
+  if(o.status==='pending')return 'Bekleyen';
+  if(o.status==='approved')return 'Onaylandı';
+  return String(o.status||'');
+}
+function fulfillmentText(o){
+  if(o.status==='cancelled')return 'İptal edildi';
+  return fulfillAdminTr[o.fulfillment_status]||String(o.fulfillment_status||'');
+}
+function downloadVisibleOrdersCsv(){
+  const rows=getVisibleAdminOrders();
+  if(!rows.length){alert('İndirilecek sipariş bulunamadı.');return}
+  const headers=['Sipariş No','Tarih','Müşteri Adı','Şehir','Telefon','E-posta','Ürün','Miktar','Birim Fiyat','Toplam Tutar','İyilik Payı','Kampanya','Sipariş Durumu','Kargo Durumu','Takip Kodu','Teslimat Adresi','Sipariş Notu'];
+  const lines=[headers.map(csvCell).join(';')];
+  rows.forEach(o=>{
+    const dt=o.created_at?new Date(o.created_at).toLocaleString('tr-TR'):'';
+    lines.push([
+      o.id,dt,o.customer_name,o.city,o.phone,o.customer_email,o.product_name,o.quantity,o.unit_price,
+      o.total_amount,o.charity_amount,o.campaign_title,orderStatusText(o),fulfillmentText(o),
+      o.tracking_code,o.delivery_address,o.order_note
+    ].map(csvCell).join(';'));
+  });
+  const blob=new Blob(['\ufeff'+lines.join('\r\n')],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;
+  const d=new Date(),pad=n=>String(n).padStart(2,'0');
+  a.download='iyilik-mutfagi-siparisler-'+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'.csv';
+  document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function labelHtml(o){
+  const q=Number(o.quantity||0);
+  const unit=o.product_unit||'';
+  return '<section class="label">'+
+    '<div class="brand">İYİLİK MUTFAĞI</div>'+
+    '<div class="orderno">Sipariş #'+esc(o.id)+'</div>'+
+    '<div class="name">'+esc(o.customer_name||'')+'</div>'+
+    '<div class="address">'+esc(o.delivery_address||'Adres belirtilmemiş')+'</div>'+
+    '<div class="city">'+esc(o.city||'')+'</div>'+
+    (o.phone?'<div class="phone">Tel: '+esc(o.phone)+'</div>':'')+
+    '<hr><div><b>Ürün:</b> '+esc(o.product_name||'')+'</div>'+
+    '<div><b>Miktar:</b> '+esc(q)+' '+esc(unit)+'</div>'+
+    (o.order_note?'<div class="note"><b>Not:</b> '+esc(o.order_note)+'</div>':'')+
+    (o.tracking_code?'<div class="tracking"><b>Takip:</b> '+esc(o.tracking_code)+'</div>':'')+
+    '</section>';
+}
+function openLabelPrint(rows){
+  const printable=(rows||[]).filter(o=>o.status!=='cancelled');
+  if(!printable.length){alert('Yazdırılacak sipariş bulunamadı.');return}
+  const w=window.open('','_blank');
+  if(!w){alert('Yazdırma penceresi açılamadı. Tarayıcı açılır pencere iznini kontrol edin.');return}
+  w.document.write('<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Kargo Etiketleri</title><style>'+
+    '@page{size:A6;margin:6mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;color:#111}.label{page-break-after:always;border:2px solid #111;padding:10mm;min-height:135mm}.label:last-child{page-break-after:auto}.brand{font-size:20px;font-weight:800;margin-bottom:10px}.orderno{font-size:18px;font-weight:700;margin-bottom:16px}.name{font-size:22px;font-weight:800;margin-bottom:8px}.address{font-size:17px;line-height:1.35;margin-bottom:8px}.city{font-size:19px;font-weight:700}.phone{margin-top:6px;font-size:16px}hr{margin:16px 0;border:0;border-top:1px solid #555}.label div{margin-bottom:6px}.note{margin-top:12px;padding:8px;border:1px solid #777}.tracking{margin-top:12px;font-size:17px}'+
+    '</style></head><body>'+printable.map(labelHtml).join('')+'<script>window.onload=()=>{window.print()}<\/script></body></html>');
+  w.document.close();
+}
+function printOrderLabel(id){
+  const o=adminOrderRows.find(x=>Number(x.id)===Number(id));
+  if(o)openLabelPrint([o]);
+}
+$('downloadOrdersCsv').onclick=downloadVisibleOrdersCsv;
+$('printVisibleLabels').onclick=()=>openLabelPrint(getVisibleAdminOrders());
+window.printOrderLabel=printOrderLabel;
+
 $('adminOrderSearch').oninput=renderAdminOrders;
 document.querySelectorAll('.adminOrderFilter').forEach(b=>b.onclick=()=>{adminOrderFilter=b.dataset.filter||'all';renderAdminOrders()});
 async function loadOrders(){try{const rr=await fetch(EMAIL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'admin_orders',pin:$('pin').value.trim()})}),jj=await rr.json().catch(()=>({}));if(!rr.ok||jj.ok===false)throw new Error(jj.error||'Siparişler alınamadı');adminOrderRows=jj.data||[];adminOrderFilter='all';$('adminOrderSearch').value='';$('adminOrderSummary').style.display='block';$('adminOrderTools').style.display='block';updateAdminOrderSummary();renderAdminOrders();amsg('Siparişler yüklendi.')}catch(e){amsg(e.message,true)}}
