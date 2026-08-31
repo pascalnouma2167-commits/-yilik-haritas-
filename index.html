@@ -92,6 +92,20 @@ nav{
 <div id="sheet" class="sheet"><div class="panel"><div class="top"><div><h1 id="pname"></h1><p id="pdesc"></p></div><button class="close" id="close">×</button></div><div class="quote"><strong id="pprice"></strong><div id="pcharity" class="mini"></div></div><label>Adınız</label><input id="customerName" placeholder="Ad Soyad"><label>Şehir</label><input id="customerCity" value="Zonguldak"><div id="deliveryFields"><label>E-posta</label><input id="customerEmail" type="email" inputmode="email" autocomplete="email" placeholder="ornek@email.com"><label>Telefon</label><input id="customerPhone" type="tel" inputmode="tel" placeholder="05xx xxx xx xx"><label>Teslimat adresi</label><textarea id="deliveryAddress" placeholder="Mahalle, sokak, bina/daire ve ilçe"></textarea><label>Teslimat yöntemi</label><select id="deliveryMethod"><option value="Kargo">Kargo</option></select><div class="mini deliveryNote">Kargo ücreti ödeme aşamasında netleşecek.</div></div><label>Sipariş Notu <span class="muted">(isteğe bağlı)</span></label><textarea id="orderNote" maxlength="300" placeholder="Örn. Kapıya bırakın, öğleden sonra teslim edilsin..."></textarea><div class="mini">En fazla 300 karakter.</div><label>Miktar</label><input id="qty" type="number" min="1" value="1"><label>Desteklemek istediğiniz kampanya</label><select id="campaign"></select><div id="offerBox" style="display:none"><label>Birim fiyat teklifiniz (₺)</label><input id="offerPrice" type="number" min="1"></div><div class="actions"><button class="btn alt" id="offer" style="display:none">Teklif Ver</button><button class="btn" id="order" style="width:100%">Siparişimi Oluştur</button></div><div id="msg"></div></div></div>
 <div id="orderConfirm" class="sheet"><div class="panel"><div class="top"><div><h1>Siparişini Kontrol Et</h1><p class="muted">Göndermeden önce bilgilerini son kez kontrol et.</p></div><button class="close" id="orderConfirmClose">×</button></div><div id="orderConfirmBody"></div><div class="actions"><button class="btn alt" id="orderBack">Geri Dön</button><button class="btn" id="orderConfirmBtn">Siparişi Onayla</button></div></div></div>
 <div id="admin" class="sheet"><div class="panel"><div class="top"><h1>Yönetici Paneli</h1><button class="close" id="adminClose">×</button></div><label>PIN</label><input id="pin" type="password" inputmode="numeric"><div class="actions" style="margin-top:16px"><button class="btn" id="loadOrders">Siparişleri Getir</button><button class="btn alt" id="loadOffers">Teklifleri Getir</button></div><button class="btn alt" id="loadSettings" style="width:100%;margin-top:12px">⚙️ Mağaza Ayarları</button><button class="btn alt" id="loadCampaignResults" style="width:100%;margin-top:12px">✅ Kampanya Sonucu / Şeffaflık</button><div id="adminMsg"></div><div id="settingsPanel"></div>
+<div id="adminOrderSummary" style="display:none;margin:14px 0">
+  <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">
+    <div class="notice"><b id="sumPending">0</b><div class="muted">Bekleyen</div></div>
+    <div class="notice"><b id="sumPreparing">0</b><div class="muted">Hazırlanan</div></div>
+    <div class="notice"><b id="sumShipped">0</b><div class="muted">Kargoda</div></div>
+    <div class="notice"><b id="sumDelivered">0</b><div class="muted">Teslim</div></div>
+    <div class="notice"><b id="sumCancelled">0</b><div class="muted">İptal</div></div>
+    <div class="notice"><b id="sumApproved">0</b><div class="muted">Onaylandı</div></div>
+  </div>
+  <div class="notice" style="margin-top:10px">
+    <b>Bugün</b>
+    <div id="todayOrderStats" class="muted" style="margin-top:6px">0 sipariş · 0 ₺ ciro · 0 ₺ iyilik payı</div>
+  </div>
+</div>
 <div id="adminOrderTools" style="display:none;margin:14px 0">
   <input id="adminOrderSearch" placeholder="🔎 Sipariş no, müşteri, ürün, şehir..." style="margin-bottom:10px">
   <div id="adminOrderFilters" style="display:flex;gap:7px;overflow-x:auto;padding-bottom:4px">
@@ -206,6 +220,32 @@ function orderMatchesFilter(o){
   if(['preparing','shipped','delivered'].includes(adminOrderFilter))return o.status==='approved'&&o.fulfillment_status===adminOrderFilter;
   return true;
 }
+function updateAdminOrderSummary(){
+  const rows=adminOrderRows||[];
+  const pending=rows.filter(o=>o.status==='pending').length;
+  const cancelled=rows.filter(o=>o.status==='cancelled').length;
+  const approved=rows.filter(o=>o.status==='approved'&&(!o.fulfillment_status||o.fulfillment_status==='awaiting_approval')).length;
+  const preparing=rows.filter(o=>o.status==='approved'&&o.fulfillment_status==='preparing').length;
+  const shipped=rows.filter(o=>o.status==='approved'&&o.fulfillment_status==='shipped').length;
+  const delivered=rows.filter(o=>o.status==='approved'&&o.fulfillment_status==='delivered').length;
+  $('sumPending').textContent=pending;
+  $('sumApproved').textContent=approved;
+  $('sumPreparing').textContent=preparing;
+  $('sumShipped').textContent=shipped;
+  $('sumDelivered').textContent=delivered;
+  $('sumCancelled').textContent=cancelled;
+
+  const today=new Date();
+  const yy=today.getFullYear(), mm=today.getMonth(), dd=today.getDate();
+  const todayRows=rows.filter(o=>{
+    const d=new Date(o.created_at);
+    return d.getFullYear()===yy&&d.getMonth()===mm&&d.getDate()===dd;
+  });
+  const todayCount=todayRows.length;
+  const todayRevenue=todayRows.filter(o=>o.status!=='cancelled').reduce((s,o)=>s+Number(o.total_amount||0),0);
+  const todayGoodness=todayRows.filter(o=>o.status==='approved').reduce((s,o)=>s+Number(o.charity_amount||0),0);
+  $('todayOrderStats').textContent=todayCount+' sipariş · '+fmt.format(todayRevenue)+' ₺ ciro · '+fmt.format(todayGoodness)+' ₺ iyilik payı';
+}
 function renderAdminOrders(){
   const q=($('adminOrderSearch').value||'').trim().toLocaleLowerCase('tr-TR');
   const rows=adminOrderRows.filter(o=>{
@@ -224,8 +264,8 @@ function renderAdminOrders(){
 }
 $('adminOrderSearch').oninput=renderAdminOrders;
 document.querySelectorAll('.adminOrderFilter').forEach(b=>b.onclick=()=>{adminOrderFilter=b.dataset.filter||'all';renderAdminOrders()});
-async function loadOrders(){try{const rr=await fetch(EMAIL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'admin_orders',pin:$('pin').value.trim()})}),jj=await rr.json().catch(()=>({}));if(!rr.ok||jj.ok===false)throw new Error(jj.error||'Siparişler alınamadı');adminOrderRows=jj.data||[];adminOrderFilter='all';$('adminOrderSearch').value='';$('adminOrderTools').style.display='block';renderAdminOrders();amsg('Siparişler yüklendi.')}catch(e){amsg(e.message,true)}}
-async function loadOffers(){try{$('adminOrderTools').style.display='none';const rows=await api('admin_offers',{pin:$('pin').value.trim()});$('orders').innerHTML=rows.length?rows.map(o=>'<div class="order"><b>Teklif #'+o.id+' · '+esc(o.product_name)+'</b><div>'+esc(o.customer_name)+' · '+esc(o.city)+'</div><div><b>'+fmt.format(o.offered_unit_price)+' ₺ / '+esc(o.product_unit||'birim')+'</b> · '+fmt.format(o.quantity)+' '+esc(o.product_unit||'')+'</div>'+(o.campaign_title?'<div class="muted" style="margin-top:6px">❤️ '+esc(o.campaign_title)+'</div>':'')+'<span class="status '+esc(o.status)+'">'+esc(o.status)+'</span>'+(o.status==='pending'?'<div class="orderBtns"><button class="btn alt" onclick="decideOffer('+o.id+',false)">Reddet</button><button class="btn" onclick="decideOffer('+o.id+',true)">Teklifi Onayla</button></div>':'')+'</div>').join(''):'<div class="notice">Henüz teklif yok.</div>';amsg('Teklifler yüklendi.')}catch(e){amsg(e.message,true)}}
+async function loadOrders(){try{const rr=await fetch(EMAIL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'admin_orders',pin:$('pin').value.trim()})}),jj=await rr.json().catch(()=>({}));if(!rr.ok||jj.ok===false)throw new Error(jj.error||'Siparişler alınamadı');adminOrderRows=jj.data||[];adminOrderFilter='all';$('adminOrderSearch').value='';$('adminOrderSummary').style.display='block';$('adminOrderTools').style.display='block';updateAdminOrderSummary();renderAdminOrders();amsg('Siparişler yüklendi.')}catch(e){amsg(e.message,true)}}
+async function loadOffers(){try{$('adminOrderTools').style.display='none';$('adminOrderSummary').style.display='none';const rows=await api('admin_offers',{pin:$('pin').value.trim()});$('orders').innerHTML=rows.length?rows.map(o=>'<div class="order"><b>Teklif #'+o.id+' · '+esc(o.product_name)+'</b><div>'+esc(o.customer_name)+' · '+esc(o.city)+'</div><div><b>'+fmt.format(o.offered_unit_price)+' ₺ / '+esc(o.product_unit||'birim')+'</b> · '+fmt.format(o.quantity)+' '+esc(o.product_unit||'')+'</div>'+(o.campaign_title?'<div class="muted" style="margin-top:6px">❤️ '+esc(o.campaign_title)+'</div>':'')+'<span class="status '+esc(o.status)+'">'+esc(o.status)+'</span>'+(o.status==='pending'?'<div class="orderBtns"><button class="btn alt" onclick="decideOffer('+o.id+',false)">Reddet</button><button class="btn" onclick="decideOffer('+o.id+',true)">Teklifi Onayla</button></div>':'')+'</div>').join(''):'<div class="notice">Henüz teklif yok.</div>';amsg('Teklifler yüklendi.')}catch(e){amsg(e.message,true)}}
 async function sendOrderEmail(order_id,event){try{const headers={'Content-Type':'application/json'};if(token)headers.Authorization='Bearer '+token;const r=await fetch(EMAIL_API,{method:'POST',headers,body:JSON.stringify({action:'notify',pin:$('pin').value.trim(),order_id,event})});const j=await r.json().catch(()=>({}));if(!r.ok||j.ok===false)throw new Error(j.error||'E-posta gönderilemedi');return true}catch(e){console.warn('E-posta bildirimi:',e);return false}}
 async function decide(id,approve){try{const r=await api('admin_decide',{pin:$('pin').value.trim(),order_id:id,approve});let mailOk=true;if(approve)mailOk=await sendOrderEmail(id,'approved');amsg(approve?'Sipariş onaylandı. Yeni fiyat '+fmt.format(r.new_price)+' ₺, stok '+fmt.format(r.remaining_stock)+'.'+(mailOk?' E-posta gönderildi.':' E-posta gönderilemedi; sipariş onayı geçerli.'):'Sipariş reddedildi.');await Promise.all([loadOrders(),boot()])}catch(e){amsg(e.message,true)}}
 async function decideOffer(id,approve){try{const r=await api('admin_decide_offer',{pin:$('pin').value.trim(),offer_id:id,approve});amsg(approve?'Teklif onaylandı ve siparişe dönüştü. Sipariş #'+r.order_id+' · İyilik '+fmt.format(r.iyilik_pay)+' ₺.':'Teklif reddedildi.');await Promise.all([loadOffers(),boot()])}catch(e){amsg(e.message,true)}}
