@@ -105,6 +105,18 @@ nav{
     <b>Bugün</b>
     <div id="todayOrderStats" class="muted" style="margin-top:6px">0 sipariş · 0 ₺ ciro · 0 ₺ iyilik payı</div>
   </div>
+  <div class="notice" style="margin-top:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <b>📊 Satış Raporu</b>
+      <div style="display:flex;gap:6px;overflow-x:auto">
+        <button class="btn alt salesRangeBtn" data-days="1" style="padding:8px 10px;white-space:nowrap">Bugün</button>
+        <button class="btn alt salesRangeBtn" data-days="7" style="padding:8px 10px;white-space:nowrap">7 Gün</button>
+        <button class="btn alt salesRangeBtn" data-days="30" style="padding:8px 10px;white-space:nowrap">30 Gün</button>
+      </div>
+    </div>
+    <div id="salesReportTotals" style="margin-top:10px"></div>
+    <div id="salesReportProducts" style="margin-top:10px"></div>
+  </div>
 </div>
 <div id="adminOrderTools" style="display:none;margin:14px 0">
   <input id="adminOrderSearch" placeholder="🔎 Sipariş no, müşteri, ürün, şehir..." style="margin-bottom:10px">
@@ -224,6 +236,40 @@ function orderMatchesFilter(o){
   if(['preparing','shipped','delivered'].includes(adminOrderFilter))return o.status==='approved'&&o.fulfillment_status===adminOrderFilter;
   return true;
 }
+let salesReportDays=7;
+function orderCreatedWithinDays(o,days){
+  if(!o.created_at)return false;
+  const d=new Date(o.created_at),now=new Date();
+  if(days===1)return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth()&&d.getDate()===now.getDate();
+  const start=new Date(now);start.setHours(0,0,0,0);start.setDate(start.getDate()-(days-1));
+  return d>=start&&d<=now;
+}
+function updateSalesReport(){
+  const rows=(adminOrderRows||[]).filter(o=>o.status!=='cancelled'&&orderCreatedWithinDays(o,salesReportDays));
+  const approved=rows.filter(o=>o.status==='approved');
+  const revenue=rows.reduce((s,o)=>s+Number(o.total_amount||0),0);
+  const goodness=approved.reduce((s,o)=>s+Number(o.charity_amount||0),0);
+  const qty=rows.reduce((s,o)=>s+Number(o.quantity||0),0);
+  $('salesReportTotals').innerHTML='<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px">'+
+    '<div><b>'+rows.length+'</b><div class="muted">Sipariş</div></div>'+
+    '<div><b>'+fmt.format(revenue)+' ₺</b><div class="muted">Ciro</div></div>'+
+    '<div><b>'+fmt.format(goodness)+' ₺</b><div class="muted">Onaylı iyilik payı</div></div>'+
+    '<div><b>'+fmt.format(qty)+'</b><div class="muted">Satılan miktar</div></div></div>';
+  const by={};
+  rows.forEach(o=>{
+    const key=o.product_name||'Ürün';
+    if(!by[key])by[key]={qty:0,orders:0,unit:o.product_unit||''};
+    by[key].qty+=Number(o.quantity||0);by[key].orders++;
+  });
+  const products=Object.entries(by).sort((a,b)=>b[1].qty-a[1].qty);
+  $('salesReportProducts').innerHTML=products.length?'<b>Ürün performansı</b>'+products.map(([name,x],i)=>
+    '<div style="display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid rgba(0,0,0,.08)">'+
+    '<span>'+(i===0?'🏆 ':'')+esc(name)+'</span><b>'+fmt.format(x.qty)+' '+esc(x.unit)+' · '+x.orders+' sipariş</b></div>'
+  ).join(''):'<div class="muted">Bu dönemde sipariş yok.</div>';
+  document.querySelectorAll('.salesRangeBtn').forEach(b=>{const a=Number(b.dataset.days)===salesReportDays;b.style.fontWeight=a?'800':'600';b.style.opacity=a?'1':'.7'});
+}
+document.querySelectorAll('.salesRangeBtn').forEach(b=>b.onclick=()=>{salesReportDays=Number(b.dataset.days)||7;updateSalesReport()});
+
 function updateAdminOrderSummary(){
   const rows=adminOrderRows||[];
   const pending=rows.filter(o=>o.status==='pending').length;
@@ -340,7 +386,7 @@ window.printOrderLabel=printOrderLabel;
 
 $('adminOrderSearch').oninput=renderAdminOrders;
 document.querySelectorAll('.adminOrderFilter').forEach(b=>b.onclick=()=>{adminOrderFilter=b.dataset.filter||'all';renderAdminOrders()});
-async function loadOrders(){try{const rr=await fetch(EMAIL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'admin_orders',pin:$('pin').value.trim()})}),jj=await rr.json().catch(()=>({}));if(!rr.ok||jj.ok===false)throw new Error(jj.error||'Siparişler alınamadı');adminOrderRows=jj.data||[];adminOrderFilter='all';$('adminOrderSearch').value='';$('adminOrderSummary').style.display='block';$('adminOrderTools').style.display='block';updateAdminOrderSummary();renderAdminOrders();amsg('Siparişler yüklendi.')}catch(e){amsg(e.message,true)}}
+async function loadOrders(){try{const rr=await fetch(EMAIL_API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'admin_orders',pin:$('pin').value.trim()})}),jj=await rr.json().catch(()=>({}));if(!rr.ok||jj.ok===false)throw new Error(jj.error||'Siparişler alınamadı');adminOrderRows=jj.data||[];adminOrderFilter='all';$('adminOrderSearch').value='';$('adminOrderSummary').style.display='block';$('adminOrderTools').style.display='block';updateAdminOrderSummary();updateSalesReport();renderAdminOrders();amsg('Siparişler yüklendi.')}catch(e){amsg(e.message,true)}}
 async function loadOffers(){try{$('adminOrderTools').style.display='none';$('adminOrderSummary').style.display='none';const rows=await api('admin_offers',{pin:$('pin').value.trim()});$('orders').innerHTML=rows.length?rows.map(o=>'<div class="order"><b>Teklif #'+o.id+' · '+esc(o.product_name)+'</b><div>'+esc(o.customer_name)+' · '+esc(o.city)+'</div><div><b>'+fmt.format(o.offered_unit_price)+' ₺ / '+esc(o.product_unit||'birim')+'</b> · '+fmt.format(o.quantity)+' '+esc(o.product_unit||'')+'</div>'+(o.campaign_title?'<div class="muted" style="margin-top:6px">❤️ '+esc(o.campaign_title)+'</div>':'')+'<span class="status '+esc(o.status)+'">'+esc(o.status)+'</span>'+(o.status==='pending'?'<div class="orderBtns"><button class="btn alt" onclick="decideOffer('+o.id+',false)">Reddet</button><button class="btn" onclick="decideOffer('+o.id+',true)">Teklifi Onayla</button></div>':'')+'</div>').join(''):'<div class="notice">Henüz teklif yok.</div>';amsg('Teklifler yüklendi.')}catch(e){amsg(e.message,true)}}
 async function sendOrderEmail(order_id,event){try{const headers={'Content-Type':'application/json'};if(token)headers.Authorization='Bearer '+token;const r=await fetch(EMAIL_API,{method:'POST',headers,body:JSON.stringify({action:'notify',pin:$('pin').value.trim(),order_id,event})});const j=await r.json().catch(()=>({}));if(!r.ok||j.ok===false)throw new Error(j.error||'E-posta gönderilemedi');return true}catch(e){console.warn('E-posta bildirimi:',e);return false}}
 async function decide(id,approve){try{const r=await api('admin_decide',{pin:$('pin').value.trim(),order_id:id,approve});let mailOk=true;if(approve)mailOk=await sendOrderEmail(id,'approved');amsg(approve?'Sipariş onaylandı. Yeni fiyat '+fmt.format(r.new_price)+' ₺, stok '+fmt.format(r.remaining_stock)+'.'+(mailOk?' E-posta gönderildi.':' E-posta gönderilemedi; sipariş onayı geçerli.'):'Sipariş reddedildi.');await Promise.all([loadOrders(),boot()])}catch(e){amsg(e.message,true)}}
