@@ -217,6 +217,7 @@ $('orderConfirmBtn').onclick=async()=>{
   try{
     btn.disabled=true;btn.textContent='Siparişin oluşturuluyor…';
     const data=pendingOrderData;
+    if(!data.idempotency_key)data.idempotency_key=(crypto&&crypto.randomUUID)?crypto.randomUUID():('ord-'+Date.now()+'-'+Math.random().toString(36).slice(2));
     const r=await api('order',data);
     const campaignTitle=(C.find(c=>Number(c.id)===Number(data.campaign_id))||{}).title||'Seçilen kampanya';
     $('orderConfirm').classList.remove('show');
